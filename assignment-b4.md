@@ -199,3 +199,84 @@ emma_counts %>% head(n=20) %>%
 ```
 
 ![](assignment-b4_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+## Exercise 2: Modified Pig Latin
+
+Here, I will create a function that takes in a sentence, and turns it
+into a modified version of Pig Latin. My version will have the following
+rules
+
+1.  Leave words with two letters or less unmodified
+2.  Move the last consonant and any trailing vowels to the start of the
+    word
+3.  If a word starts and ends with the same consonant, add an o between
+    the part now moved the front and the original start of the word
+4.  Add an “s” to the start of the word, if we haven’t already moved an
+    s to the start
+
+I’ll first define a helper function that takes only a single word of
+length greater than 2, to do the heavy lifting.
+
+``` r
+.piglatin_word <- function(word){
+  
+  # select the case of the s to add, based on the first letter of the word
+  s_case <- ifelse(str_detect(word, "^[:upper:]"), "S","s")
+  
+  word <- tolower(word)
+  
+  suffix_loc <- str_locate(word, "[^a,e,i,o,u,y][a,e,i,o,u,y]*$") # Find the last consonant and trailing vowels
+  suffix = str_sub(word,suffix_loc[1],suffix_loc[2])
+  
+  str_c(s_case,  # Add an s to the start of the word
+        ifelse(suffix != "s", suffix, ""), # Add ending of the word, unless it's just s
+        ifelse(str_detect(word, "^([^a,e,i,o,u,y]).*\\1$"),"o", ""), # If it starts and end with the same letter, add an o in between
+        str_sub(word,0,suffix_loc[1]-1)) # And finally add the rest of the word
+}
+```
+
+``` r
+my_piglatin <- function(text) {
+    str_split_1(text, " |[:punct:]") %>%
+    map_if(\(x) (str_length(x) > 2), ~ .piglatin_word(.x)) %>%
+    unlist
+}
+```
+
+``` r
+my_piglatin <- function(text) {
+  str_replace_all(text,"([:alpha:]{3,})", .piglatin_word)
+}
+```
+
+``` r
+my_piglatin("hi hello")
+```
+
+    ## [1] "hi slohel"
+
+``` r
+#str_split("Hello! hi everyone.", "[:punct:]")
+str_locate("testeee", "[^a,e,i,o,u,y][a,e,i,o,u,y]*$")[1
+                                                       ]
+```
+
+    ## [1] 4
+
+``` r
+.piglatin_word("caught")
+```
+
+    ## [1] "stcaugh"
+
+``` r
+my_piglatin("This is my abba test cool sentence")
+```
+
+    ## [1] "Sthi is my sbaab stotes slcoo scesenten"
+
+TODO: Roxygen, including examples
+
+TODO: check inputs note: can’t take newlines
+
+TODO: write tests

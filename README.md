@@ -6,7 +6,7 @@ functional programming in R.
 
 Specifically, the code in this repo completes two exercises:
 1. Creating a chart of the frequency of words in Jane Austen's *Emma*
-2. Writing a function that transforms text into a custom version of piglatin
+2. Writing a function that transforms text into a custom version of Pig Latin
 
 # Repo contents
 

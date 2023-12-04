@@ -71,12 +71,12 @@ This is stored in a very similar format.
 
 ### Proprocessing
 
-First things first, we want to transform the format of emma into an
+First thing’s first, we want to transform the format of Emma into an
 array of individual words. This will require first removing the empty
 elements, and all the punctuation.
 
 ``` r
-my_emma <- emma %>%
+transformed_emma <- emma %>%
   str_replace_all("[:punct:]|[:symbol:]|[:digit:]", " ") %>% # Remove punctuation, numbers, and symbols
   tolower() %>% # Remove all capitalization
   str_split(" ") %>% # Split on the words
@@ -84,9 +84,9 @@ my_emma <- emma %>%
   unlist() # make it a character array
 
 #lastly, remove the empty entries
-my_emma <- my_emma[my_emma != ""] # Remove the blank lines
+transformed_emma <- transformed_emma[transformed_emma != ""] # Remove the blank lines
 
-head(my_emma, n = 30)
+head(transformed_emma, n = 30)
 ```
 
     ##  [1] "emma"        "by"          "jane"        "austen"      "volume"     
@@ -100,19 +100,19 @@ Here, I replaced punctuation with spaces. This occasionally divides
 words which are arguably a single word, such as “twenty-one”, and
 “long-standing”. The easy alternative is to remove punctuation outright.
 However, this creates the issue that words that are only separated by
-punctuation marks—most commonly an emdash in this text—end up being
-treated as one word. To deal with both of these issues would require a
-complicated context-dependent algorithm, but for now I’ll take the
-lesser of two evils.
+punctuation marks—most commonly an emdash in Emma—end up being treated
+as one word, e.g. marksmost and Emmaend in this sentence. Neither of
+these solutions is ideal, but I prefer dividing words rather than adding
+completely non-sensical words to the count.
 
 ### Counting and filtering
 
 Now we need to generate a count. Luckily, dplyr provides a convenient
-function for this. After this we can easily select based on the list of
-stopwords.
+function for this if we transform our data into a tibble. Dplyr also
+provides a convenient way to filter out the stopwords.
 
 ``` r
-emma_counts <- tibble("word" = my_emma) %>%
+emma_counts <- tibble("word" = transformed_emma) %>%
   count(word)
 
 emma_counts <- emma_counts %>%
@@ -140,8 +140,8 @@ We can see a few things that are not great here. “Mr,” “Ms”, “Mrs”,
 “Miss”, “Harriet”, and “Emma” all come from addressing characters. This
 doesn’t really tell us much about Austen’s word choice. Then of course,
 “s” shows up from contractions where the apostrophe was replaced with a
-space. Let’s remove all of this as well, along with some more proper
-nouns that turn up near the top.
+space, as discussed above. Let’s remove all of these words as well,
+along with some more proper nouns that turn up near the top.
 
 ``` r
 manual_word_blacklist <- c("mr", "s", "mrs", "miss", "harriet", "emma",
@@ -181,10 +181,11 @@ head(emma_counts, n = 20)
 There’s another approximation that has to be made here. Emma contains a
 character named “Frank”. Presumably, a large share of the occurrences of
 the word “frank” refers to this character as opposed to the English
-noun, so I am removing it from the list. However, we do also lose any
-usage of the noun. A more sophisticated approach might have used regex
-to match lower case occurences of the word “frank”, although this still
-would have missed instances that occur at the start of the sentence.
+adjective, so I am removing it from the list. However, we do also lose
+any usage of the adjective (or noun, if Emma ever enjoys a german-style
+sausage!). A more sophisticated approach might have used regex to count
+lower case occurrences of the word “frank”, although this would have
+missed instances that occur at the start of the sentence.
 
 ### Plotting
 
@@ -203,14 +204,14 @@ emma_counts %>% head(n=20) %>%
 ## Exercise 2: Modified Pig Latin
 
 Here, I will create a function that takes in a sentence, and turns it
-into a modified version of Pig Latin. My version will have the following
-rules
+into a modified version of Pig Latin. My version of piglatin will have
+the following rules
 
 1.  Leave words with two letters or less unmodified
 2.  Move the last consonant and any trailing vowels to the start of the
     word
 3.  If a word starts and ends with the same consonant, add an o between
-    the part now moved the front and the original start of the word
+    the part now moved to the front and the original start of the word
 4.  Add an “s” to the start of the word, if we haven’t already moved an
     s to the start
 
@@ -218,6 +219,19 @@ I’ll first define a helper function that takes only a single word of
 length greater than 2, to do the heavy lifting.
 
 ``` r
+#' Piglatin word
+#' 
+#' @description This is a helper function for `my_piglatin`. It is not intended
+#' to be called independently. It takes in a word and returns the my-piglatin-ized
+#' version of the word. See `my_piglatin` for details.
+#' 
+#' @param word a string not containing any whitespace (spaces, tabs, newlines)
+#' 
+#' @return a string of the provided `word` translated into my piglatin
+#' 
+#' @importFrom stringr str_detect str_locate str_sub str_c
+#' 
+#' @examples .piglatin_word("test") # returns stotes 
 .piglatin_word <- function(word){
   
   # select the case of the s to add, based on the first letter of the word
@@ -226,57 +240,100 @@ length greater than 2, to do the heavy lifting.
   word <- tolower(word)
   
   suffix_loc <- str_locate(word, "[^a,e,i,o,u,y][a,e,i,o,u,y]*$") # Find the last consonant and trailing vowels
-  suffix = str_sub(word,suffix_loc[1],suffix_loc[2])
+  suffix = str_sub(word,suffix_loc[1],suffix_loc[2]) # save the string of the suffix itself
   
   str_c(s_case,  # Add an s to the start of the word
         ifelse(suffix != "s", suffix, ""), # Add ending of the word, unless it's just s
-        ifelse(str_detect(word, "^([^a,e,i,o,u,y]).*\\1$"),"o", ""), # If it starts and end with the same letter, add an o in between
+        ifelse(str_detect(word, "^([^a,e,i,o,u,y]).*\\1$"),"o", ""), # If the word starts and ends with the same letter, add an o in between
         str_sub(word,0,suffix_loc[1]-1)) # And finally add the rest of the word
 }
 ```
 
-``` r
-my_piglatin <- function(text) {
-    str_split_1(text, " |[:punct:]") %>%
-    map_if(\(x) (str_length(x) > 2), ~ .piglatin_word(.x)) %>%
-    unlist
-}
-```
+Now we can document and write a function that applies this to full
+sentences, and handles all the error checking.
 
 ``` r
+#' My Piglatin
+#' 
+#' @description Takes in a word or sentence and converts it into my fun version
+#' of piglatin. The transformation is summarized by these 4 rules:
+#'   1. Leave words with two letters or less unmodified
+#'   2. Move the last consonant and any trailing vowels to the start of the word
+#'   3. If a word starts and ends with the same consonant, add an o between the 
+#'     part now moved the front and the original start of the word
+#'   4. Add an "s" to the start of the word, if we haven't already moved an s to 
+#'     the start
+#' This particular implementation will capitalize the leading S if an input word
+#' had a capital letter at the start, but will otherwise make all letters
+#' lowercase. Non-alphabetical characters are unmodified.
+#' 
+#' @param text A string containing the text to be transformed. The string may
+#' consist of multiple words, but must not contain any newlines
+#' 
+#' @return the my-piglatin-ized version of the provided `text`
+#' 
+#' @export 
+#' 
+#' @importFrom stringr str_replace_all str_detect
+#' 
+#' @examples my_piglatin("Hello, world!") # returns "Slohel, sdworl!"
+#' @examples my_piglatin("Antidisestablismentarianism") #returns Smantidisestablismentarianis
+#' 
 my_piglatin <- function(text) {
+  ## Input tests ##
+  
+  # Check for nulls
+  if(is.null(text)){
+    stop("Error: check input text, cannot operate on null")
+  }
+  # Ensure input is a string
+  if(!(is.character(text) & length(text) == 1)){
+    stop("Error: incorrect input type received, please provide a single string")
+  }
+  # Check for newlines
+  if(str_detect(text, "\n")){
+    stop("Error: Text may not contain newlines")
+  }
+  
+  
+  ## Function execution ##
   str_replace_all(text,"([:alpha:]{3,})", .piglatin_word)
 }
 ```
 
-``` r
-my_piglatin("hi hello")
-```
-
-    ## [1] "hi slohel"
+Now, let’s write a few basic tests
 
 ``` r
-#str_split("Hello! hi everyone.", "[:punct:]")
-str_locate("testeee", "[^a,e,i,o,u,y][a,e,i,o,u,y]*$")[1
-                                                       ]
+# Build up the regular usage cases
+test_that("Regular use",
+          {
+            expect_identical(my_piglatin("piglatin"), "snpiglati") # simple case
+            expect_identical(my_piglatin("Capital"), "Slcapita") # upper case at start of word
+            expect_identical(my_piglatin("mate"), "stema") # trailing vowels
+            expect_identical(my_piglatin("test"), "stotes") # Same consonant at beginning and end of word
+            expect_identical(my_piglatin("bass"), "sbas") # 's' at end of word
+            expect_identical(my_piglatin("hi"), "hi") # Ignore two letter words
+            expect_identical(my_piglatin("1234567890!@#$%^&*()-={}:|<>?"), "1234567890!@#$%^&*()-={}:|<>?") # Ignore non-alphabetical
+            expect_identical(my_piglatin("'ab'"), "'ab'") # Special check for single quotes
+            expect_identical(my_piglatin('"ab"'), '"ab"') # Special check for double quotes
+            expect_identical(my_piglatin("This line is to test 'my_piglatin'!"), "Sthi sneli is to stotes 'my_snpiglati'!") # Put it all together in a sentence
+          })
 ```
 
-    ## [1] 4
+    ## Test passed 😀
 
 ``` r
-.piglatin_word("caught")
+# Test for error conditions
+
+test_that("Error cases",
+          {
+            expect_error(my_piglatin(NULL), "Error: check input text, cannot operate on null")
+            expect_error(my_piglatin(0), "Error: incorrect input type received, please provide a single string")
+            expect_error(my_piglatin(c("array", "of", "words")),"Error: incorrect input type received, please provide a single string" )
+            expect_error(my_piglatin(list("list", "of", "words")),"Error: incorrect input type received, please provide a single string" )
+            expect_error(my_piglatin("text
+                                     with nexline"), "Error: Text may not contain newlines")
+          })
 ```
 
-    ## [1] "stcaugh"
-
-``` r
-my_piglatin("This is my abba test cool sentence")
-```
-
-    ## [1] "Sthi is my sbaab stotes slcoo scesenten"
-
-TODO: Roxygen, including examples
-
-TODO: check inputs note: can’t take newlines
-
-TODO: write tests
+    ## Test passed 🌈
